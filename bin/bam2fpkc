@@ -79,13 +79,12 @@ if __name__ == '__main__':
 
     #-------------------------------------------------
     # Run through a single fasta file and calculate fpkc
-    single_parser = subparsers.add_parser('single',
+    contig_parser = subparsers.add_parser('contig',
                                           formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                           help='calculate fpkc for one set of contigs',
                                           description='Calculate fpkc for one set of contigs')
-    single_parser.add_argument('sambam', help="sam/bam file to parse")
-    single_parser.add_argument('contigs', help="fasta file of contigs")
-    single_parser.add_argument('--sam', '-s', action='store_true', default=False, help="mapping is a sam file")
+    contig_parser.add_argument('bam', help="bam file to parse")
+    contig_parser.add_argument('contigs', help="fasta file of contigs")
     
     #-------------------------------------------------
     # Run through a single fasta file and calculate fpkc
@@ -93,10 +92,9 @@ if __name__ == '__main__':
                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                        help='calculate mfpkc for a set of bins',
                                        description='Calculate mfpkc for a set of bins')
-    bin_parser.add_argument('sambam', help="sam/bam file to parse")
+    bin_parser.add_argument('bam', help="bam file to parse")
     bin_parser.add_argument('contigs', help="fasta file of contigs")
     bin_parser.add_argument('bins', help="bin assignments")
-    bin_parser.add_argument('--sam', '-s', action='store_true', default=False, help="mapping is a sam file")
     
     #-------------------------------------------------
     # get and check options
@@ -110,7 +108,7 @@ if __name__ == '__main__':
     #-------------------------------------------------
     # do what we came here to do
     try:
-        BT_parser = bam2fpkc.Sam2fpkcOptionsParser()
+        BT_parser = bam2fpkc.Bam2fpkcOptionsParser()
         if(False):
             import cProfile
             cProfile.run('BT_parser.parseOptions(args)', 'prof')
