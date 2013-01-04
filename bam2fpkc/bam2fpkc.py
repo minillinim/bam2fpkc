@@ -55,7 +55,7 @@ import pysam
 import numpy as np
 np.seterr(all='raise')  
 
-# bam2fpkc imports
+import threading
 
 ###############################################################################
 ###############################################################################
@@ -72,94 +72,126 @@ class BinLengthError(BaseException): pass
 ###############################################################################
 
 class Bam2fpkcOptionsParser():
-    def __init__(self): pass
-    
+    def __init__(self):
+        self.headers = None                 # sorted contig headers
+        self.binIDs = []                    # sorted list of binIDs
+        self.binAssignments = {}            # cid -> bid
+        self.fpkc = {}                      # cid -> fpkc 
+        self.mfpkc = {}                     # bid -> mfpkc 
+        self.numBams = 0
+        
     def parseOptions(self, options):
+        """organise all the stuff what needs doing"""
+        self.numBams = len(options.bams)
         
+        #-----
         # get a list of contig headers
-        CP = ContigParser()
-        try:
-            with open(options.contigs) as con_fh:
-                headers = CP.getHeaders(con_fh)
-        except:
-             print "Could not parse contig file: %s %s" % (options.contigs,sys.exc_info()[0])
-             raise
-         
-        # we'll need a BamParser no matter what! 
-        BP = BamParser()
-        BP.openBam(options.bam)
+        self.parseContigs(options.contigs)
         
-        # now work out the fpkc for all contigs
-        fpkc = BP.getFpkc(headers)
+        #-----
+        # make space for the various measurements we'll be taking
+        for cid in self.headers:
+            self.fpkc[cid] = [0.0]*self.numBams
+
+        if(options.subparser_name == 'bin'):
+            # we'll also need room for the bins
+            self.parseBinsFile(options.bins)
+            for bid in self.binIDs:
+                self.mfpkc[bid] = [[] for i in range(self.numBams)]
         
+        #-----
+        # now parse the bams
+        for bam_counter in range(self.numBams):
+            bam_file = options.bams[bam_counter] 
+            # we'll need a BamParser no matter what! 
+            BP = BamParser()
+            BP.openBam(bam_file)
+            
+            # now work out the fpkc for all contigs for this sample
+            tmp_fpkc = BP.getFpkc(self.headers)
+            
+            for cid in tmp_fpkc.keys():
+                self.fpkc[cid][bam_counter] = tmp_fpkc[cid] 
+
+        #-----
+        # print results        
         if(options.subparser_name == 'contig'):
-            # Make fpkc for a single fasta file
-            self.printFpkc(fpkc)
+            self.printFpkc()
 
         elif(options.subparser_name == 'bin'):
-            # Make mfpkc for a set of bins
-            # we should have a tab sep'd bins file which looks like:
-            #
-            # cid -> bid
-            #
-            try:
-                with open(options.bins) as bin_fh:
-                    bin_assignments = self.parseBinsFile(bin_fh)
-            except:
-                 print "Could not parse bins file: %s %s" % (options.bins,sys.exc_info()[0])
-                 raise
-
-            # make sure that all contigs are assigned to a bin
-            if len(bin_assignments.keys()) != len(headers):
-                raise BinLengthError("bin file does not match headers",
-                                     "B: %d != H: %d " % (len(bin_assignments.keys()),
-                                                          len(headers)
-                                                          )
-                                     )
-            self.printMfpkc(fpkc, bin_assignments)
+            self.printMfpkc()
             
         # clean up
         BP.closeBam()
         
         return 0
 
-    def parseBinsFile(self, bfh):
+    def parseContigs(self, contigs_file):
+        """Parse the contigs file and get headers"""
+        CP = ContigParser()
+        try:
+            with open(contigs_file) as con_fh:
+                self.headers = CP.getHeaders(con_fh)
+        except:
+            print "Could not parse contig file: %s %s" % (contigs_file,sys.exc_info()[0])
+            raise
+
+    def parseBinsFile(self, bins_file):
         """Extract contig Id to bins assignments
         
         bfh should be a tab sep'd bins file which looks like:
         
         # header
-        cid -> bid
-        cid -> bid
+        cid1 -> bid
+        cid2 -> bid
         ...
-        
         """
-        bin_assignments = {}
-        for line in bfh:
-            line = line.rstrip()
-            if len(line) > 0:
-                if line[0] != '#':
-                    parts = line.split('\t')
-                    bin_assignments[parts[0]] = parts[1]
-                    
-        return bin_assignments
-    
-    def printFpkc(self, fpkc):
+        tmp_bids = {}
+        try:
+            with open(bins_file) as bin_fh:
+                for line in bin_fh:
+                    line = line.rstrip()
+                    if len(line) > 0:
+                        if line[0] != '#':
+                            parts = line.split('\t')
+                            self.binAssignments[parts[0]] = parts[1]
+                            tmp_bids[parts[1]] = True
+        except:
+             print "Could not parse bins file: %s %s" % (bins_file,sys.exc_info()[0])
+             raise
+
+        # make sure that all contigs are assigned to a bin
+        if len(self.binAssignments.keys()) != len(self.headers):
+            raise BinLengthError("bin file does not match headers",
+                                 "B: %d != H: %d " % (len(self.binAssignments.keys()),
+                                                      len(self.headers)
+                                                      )
+                                 )
+        # we'll need a list of binIDs later
+        self.binIDs = sorted(tmp_bids.keys())
+
+    def printFpkc(self):
         """print the results of our labour"""
-        for cid in fpkc.keys():
-            print "\t".join([cid, "%0.4f"%fpkc[cid]])
-        
-    def printMfpkc(self, fpkc, binAssignments):
+        for cid in self.headers:
+            print "\t".join([cid,
+                             "\t".join(["%0.4f" % i for i in self.fpkc[cid]])
+                             ]
+                            )
+
+    def printMfpkc(self):
         """break fpkc results into bin specific units and print"""
-        mfpkc = {}
-        for cid in binAssignments:
-            try:
-                mfpkc[binAssignments[cid]].append(fpkc[cid])
-            except KeyError:
-                mfpkc[binAssignments[cid]] = [fpkc[cid]]
-                
-        for bid in mfpkc.keys():
-             print "\t".join([bid, "%0.4f"%np.median(mfpkc[bid])])
+        # first sort the cid_fpkc's into bin specific groups
+        for cid in self.headers:
+            for bam_counter in range(self.numBams):
+                self.mfpkc[self.binAssignments[cid]][bam_counter].append(self.fpkc[cid][bam_counter])
+        
+        # take the median on the fly and print
+        for bid in self.binIDs:
+            #for bam_counter in range(self.numBams):
+            print "\t".join([bid,
+                             "\t".join(["%0.4f" % np.median(i) for i in self.mfpkc[bid]])
+                             ]
+                            )
     
 ###############################################################################
 ###############################################################################
@@ -260,7 +292,7 @@ class ContigParser:
         headers = []
         for cid,seq,qual in self.readfq(contigFile):
             headers.append(cid)
-        return headers
+        return sorted(headers)
        
 ###############################################################################
 ###############################################################################
