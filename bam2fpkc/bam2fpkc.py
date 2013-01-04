@@ -53,9 +53,13 @@ import argparse
 import sys
 import pysam
 import numpy as np
-np.seterr(all='raise')  
-
+from os import makedirs
+from os.path import dirname, splitext, basename
+import errno
 import threading
+import time
+
+np.seterr(all='raise')  
 
 ###############################################################################
 ###############################################################################
@@ -66,11 +70,24 @@ class CouldNotOpenMappingException(BaseException): pass
 class MappingNotOpenException(BaseException): pass
 class BinLengthError(BaseException): pass
  
+def makeSurePathExistsFor(filename):
+    """AUX: Ensure it's possible to make an output file"""
+    path = dirname(filename)
+    if path != '':
+        try:
+            makedirs(path)
+        except OSError as exception:
+            if exception.errno != errno.EEXIST:
+                raise
+def getBamDescriptor(fullPath):
+    """AUX: Reduce a full path to just the file name minus extension"""
+    return splitext(basename(fullPath))[0]
+   
 ###############################################################################
 ###############################################################################
 ###############################################################################
 ###############################################################################
-
+     
 class Bam2fpkcOptionsParser():
     def __init__(self):
         self.headers = None                 # sorted contig headers
@@ -79,10 +96,26 @@ class Bam2fpkcOptionsParser():
         self.fpkc = {}                      # cid -> fpkc 
         self.mfpkc = {}                     # bid -> mfpkc 
         self.numBams = 0
+        self.numParsed = 0
+        self.bamNames = []
+        
+        # threads
+        self.varLock = threading.Lock() # we don't have many variables here, so use one lock for everything
+        self.totalThreads = 1               # single threaded by defaultly
+        self.threadPool = None
         
     def parseOptions(self, options):
         """organise all the stuff what needs doing"""
         self.numBams = len(options.bams)
+
+        # thready stuff
+        self.totalThreads = options.threads
+        self.threadPool = threading.BoundedSemaphore(self.totalThreads)
+        
+        #-----
+        # check to make sure we can write out what we make
+        if options.outfile != 'stdout':
+            makeSurePathExistsFor(options.outfile)
         
         #-----
         # get a list of contig headers
@@ -98,33 +131,71 @@ class Bam2fpkcOptionsParser():
             self.parseBinsFile(options.bins)
             for bid in self.binIDs:
                 self.mfpkc[bid] = [[] for i in range(self.numBams)]
+        #-----
+        # get fancy names for the bam files we'll be parsing
+        for bam_counter in range(self.numBams):
+            self.bamNames.append(getBamDescriptor(options.bams[bam_counter]))        
         
         #-----
         # now parse the bams
         for bam_counter in range(self.numBams):
-            bam_file = options.bams[bam_counter] 
-            # we'll need a BamParser no matter what! 
-            BP = BamParser()
-            BP.openBam(bam_file)
+            t = threading.Thread(target=self.parseBamfile,
+                                 args = (options.bams[bam_counter], bam_counter)
+                                 )
+            t.start()
             
-            # now work out the fpkc for all contigs for this sample
-            tmp_fpkc = BP.getFpkc(self.headers)
+        while True:
+            # don't exit till we're done!
+            self.varLock.acquire()
+            doned = False
+            try:
+                doned = self.numParsed >= self.numBams
+            finally:
+                self.varLock.release()
             
-            for cid in tmp_fpkc.keys():
-                self.fpkc[cid][bam_counter] = tmp_fpkc[cid] 
+            if doned:
+                break
+            else:
+                time.sleep(1)
 
         #-----
         # print results        
+        if options.outfile != 'stdout':
+            fs = open(options.outfile, 'w')
+        else:
+            fs = sys.stdout
+
         if(options.subparser_name == 'contig'):
-            self.printFpkc()
+            self.printFpkc(fs)
 
         elif(options.subparser_name == 'bin'):
-            self.printMfpkc()
+            self.printMfpkc(fs)
+
+        if options.outfile != 'stdout':
+            fs.close()
             
-        # clean up
-        BP.closeBam()
         
         return 0
+
+    def parseBamfile(self, bamFileName, bamCounter):
+        """ munge a bamfile and add the output to the global store"""
+        BP = BamParser()
+        BP.openBam(bamFileName)
+        
+        # now work out the fpkc for all contigs for this sample
+        tmp_fpkc = BP.getFpkc(self.headers)
+
+        # add to the main store but be threadsafe!
+        try:
+            self.varLock.acquire()
+            for cid in tmp_fpkc.keys():
+                self.fpkc[cid][bamCounter] = tmp_fpkc[cid] 
+            self.numParsed += 1
+        finally:
+            self.varLock.release()
+
+        # clean up
+        BP.closeBam()
 
     def parseContigs(self, contigs_file):
         """Parse the contigs file and get headers"""
@@ -170,16 +241,23 @@ class Bam2fpkcOptionsParser():
         # we'll need a list of binIDs later
         self.binIDs = sorted(tmp_bids.keys())
 
-    def printFpkc(self):
+    def printFpkc(self, fileStream):
         """print the results of our labour"""
+        fileStream.write("\t".join(['cid',
+                                    "\t".join(self.bamNames)
+                                    ])+"\n")
         for cid in self.headers:
-            print "\t".join([cid,
-                             "\t".join(["%0.4f" % i for i in self.fpkc[cid]])
-                             ]
-                            )
+            fileStream.write("\t".join([cid,
+                                        "\t".join(["%0.4f" % i for i in self.fpkc[cid]])
+                                        ]
+                                       )+"\n"
+                             )
 
-    def printMfpkc(self):
+    def printMfpkc(self, fileStream):
         """break fpkc results into bin specific units and print"""
+        fileStream.write("\t".join(['bid',
+                                    "\t".join(self.bamNames)
+                                    ])+"\n")
         # first sort the cid_fpkc's into bin specific groups
         for cid in self.headers:
             for bam_counter in range(self.numBams):
@@ -188,10 +266,11 @@ class Bam2fpkcOptionsParser():
         # take the median on the fly and print
         for bid in self.binIDs:
             #for bam_counter in range(self.numBams):
-            print "\t".join([bid,
-                             "\t".join(["%0.4f" % np.median(i) for i in self.mfpkc[bid]])
-                             ]
-                            )
+            fileStream.write("\t".join([bid,
+                                        "\t".join(["%0.4f" % np.median(i) for i in self.mfpkc[bid]])
+                                        ]
+                                       )+"\n"
+                             )
     
 ###############################################################################
 ###############################################################################

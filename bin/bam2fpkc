@@ -85,6 +85,8 @@ if __name__ == '__main__':
                                           description='Calculate fpkc for one set of contigs')
     contig_parser.add_argument('contigs', help="fasta file of contigs")
     contig_parser.add_argument('bams', nargs='+', help="bam file to parse")
+    contig_parser.add_argument('--outfile', '-o', default='stdout', help="print to file")
+    contig_parser.add_argument('--threads', '-t', default=1, help="number of threads to use")
     
     #-------------------------------------------------
     # Run through a single fasta file and calculate fpkc
@@ -95,6 +97,8 @@ if __name__ == '__main__':
     bin_parser.add_argument('contigs', help="fasta file of contigs")
     bin_parser.add_argument('bins', help="bin assignments")
     bin_parser.add_argument('bams', nargs='+', help="bam file to parse")
+    bin_parser.add_argument('--outfile', '-o', default='stdout', help="print to file")
+    bin_parser.add_argument('--threads', '-t', default=1, help="number of threads to use")
     
     #-------------------------------------------------
     # get and check options
