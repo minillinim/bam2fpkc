@@ -39,7 +39,7 @@
 ###############################################################################
 
 __author__ = "Michael Imelfort"
-__copyright__ = "Copyright 2012"
+__copyright__ = "Copyright 2013"
 __credits__ = ["Michael Imelfort"]
 __license__ = "GPL3"
 __version__ = "0.1.0"
@@ -65,7 +65,7 @@ def printHelp():
                    
     Contig abundance profile maker
 
-    bam2fpkc single      -> Calculate fpkc for one set of contigs
+    bam2fpkc contig      -> Calculate fpkc for one set of contigs
     bam2fpkc bin         -> Calculate mfpkc for a set of bins
     
     USE: bam2fpkc OPTION -h to see detailed options
