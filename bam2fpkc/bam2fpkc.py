@@ -89,9 +89,12 @@ class Bam2fpkcOptionsParser():
         BP = BamParser()
         BP.openBam(options.bam)
         
+        # now work out the fpkc for all contigs
+        fpkc = BP.getFpkc(headers)
+        
         if(options.subparser_name == 'contig'):
             # Make fpkc for a single fasta file
-            BP.parseBam()
+            self.printFpkc(fpkc)
 
         elif(options.subparser_name == 'bin'):
             # Make mfpkc for a set of bins
@@ -113,8 +116,8 @@ class Bam2fpkcOptionsParser():
                                                           len(headers)
                                                           )
                                      )
-            BP.parseBam()
-        
+            self.printMfpkc(fpkc, bin_assignments)
+            
         # clean up
         BP.closeBam()
         
@@ -141,6 +144,23 @@ class Bam2fpkcOptionsParser():
                     
         return bin_assignments
     
+    def printFpkc(self, fpkc):
+        """print the results of our labour"""
+        for cid in fpkc.keys():
+            print "\t".join([cid, "%0.4f"%fpkc[cid]])
+        
+    def printMfpkc(self, fpkc, binAssignments):
+        """break fpkc results into bin specific units and print"""
+        mfpkc = {}
+        for cid in binAssignments:
+            try:
+                mfpkc[binAssignments[cid]].append(fpkc[cid])
+            except KeyError:
+                mfpkc[binAssignments[cid]] = [fpkc[cid]]
+                
+        for bid in mfpkc.keys():
+             print "\t".join([bid, "%0.4f"%np.median(mfpkc[bid])])
+    
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -162,14 +182,22 @@ class BamParser:
         if self.bamFile is not None:
             self.bamFile.close()
         
-    def parseBam(self):
+    def getFpkc(self, headers):
         """Parse a bam file (handle) """
         if self.bamFile is None:
             raise MappingNotOpenException("No file handle to work on!")
+        
+        # get some storage
+        fpkc = {}
+        for cid in headers:
+            fpkc[cid] = 0.0
+        
         for reference, length in zip(self.bamFile.references, self.bamFile.lengths):
             fc = FragCounter()
             self.bamFile.fetch(reference, 0, length, callback = fc )
-            print reference, fc.count
+            fpkc[reference] = (float(fc.count) * 1000 )/ float(length)
+        
+        return fpkc
 
 ###############################################################################
 ###############################################################################

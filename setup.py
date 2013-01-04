@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='bam2fpkc',
-    version='0.1.0',
+    version='0.2.0',
     author='Michael Imelfort',
     author_email='mike@mikeimelfort.com',
     packages=['bam2fpkc', 'bam2fpkc.test'],
