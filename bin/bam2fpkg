@@ -1,25 +1,26 @@
 #!/usr/bin/env python
 ###############################################################################
 #                                                                             #
-#    sam2fpkc                                                                 #
+#    bam2fpkc                                                                 #
 #                                                                             #
-#    Entry point. See sam2fpkc/sam2fpkc.py for internals                      #
+#    Entry point. See bam2fpkc/bam2fpkc.py for internals                      #
 #                                                                             #
 #    Copyright (C) Michael Imelfort                                           #
 #                                                                             #
 ###############################################################################
 #                                                                             #
-#                                  .d8888b.  .d888          888               #
-#                                 d88P  Y88 d88P"           888               #
-#                                        88 888             888               #
-# .d8888b   8888b.  88888b.d88b.       .d88 888888 88888b.  888  888  .d8888b # 
-# 88K          "88b 888 "888 "88b  .od888P" 888    888 "88b 888 .88P d88P"    #
-# "Y8888b. .d888888 888  888  888 d88P"     888    888  888 888888K  888      #
-#      X88 888  888 888  888  888 888"      888    888 d88P 888 "88b Y88b.    #
-#  88888P' "Y888888 888  888  888 88888888  888    88888P"  888  888  "Y8888P #
+# 888                              .d8888b.  .d888          888               #
+# 888                             d88P  Y88 d88P"           888               #
+# 888                                    88 888             888               #
+# 88888b.   8888b.  88888b.d88b.       .d88 888888 88888b.  888  888  .d8888b # 
+# 888 "88b     "88b 888 "888 "88b  .od888P" 888    888 "88b 888 .88P d88P"    #
+# 888  888 .d888888 888  888  888 d88P"     888    888  888 888888K  888      #
+# 888 d88P 888  888 888  888  888 888"      888    888 d88P 888 "88b Y88b.    #
+# 88888P"  "Y888888 888  888  888 88888888  888    88888P"  888  888  "Y8888P #
 #                                                  888                        #
 #                                                  888                        #
 #                                                  888                        #
+#                                                                             #
 ###############################################################################
 #                                                                             #
 #    This program is free software: you can redistribute it and/or modify     #
@@ -51,7 +52,7 @@ __status__ = "Development"
 import argparse
 import sys
 
-from sam2fpkc import sam2fpkc
+from bam2fpkc import bam2fpkc
 
 ###############################################################################
 ###############################################################################
@@ -60,14 +61,14 @@ from sam2fpkc import sam2fpkc
 def printHelp():
     print '''\
     
-               ...::: sam2fpkc :::...
+               ...::: bam2fpkc :::...
                    
     Contig abundance profile maker
 
-    sam2fpkc single      -> Calculate fpkc for one set of contigs
-    sam2fpkc bin         -> Calculate mfpkc for a set of bins
+    bam2fpkc single      -> Calculate fpkc for one set of contigs
+    bam2fpkc bin         -> Calculate mfpkc for a set of bins
     
-    USE: sam2fpkc OPTION -h to see detailed options
+    USE: bam2fpkc OPTION -h to see detailed options
     '''
 if __name__ == '__main__':
 
@@ -109,7 +110,7 @@ if __name__ == '__main__':
     #-------------------------------------------------
     # do what we came here to do
     try:
-        BT_parser = sam2fpkc.Sam2fpkcOptionsParser()
+        BT_parser = bam2fpkc.Sam2fpkcOptionsParser()
         if(False):
             import cProfile
             cProfile.run('BT_parser.parseOptions(args)', 'prof')

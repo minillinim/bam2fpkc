@@ -1,1 +1,1 @@
-sam2fpkc
+bam2fpkc
