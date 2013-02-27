@@ -189,7 +189,10 @@ class Bam2fpkcOptionsParser():
         try:
             self.varLock.acquire()
             for cid in tmp_fpkc.keys():
-                self.fpkc[cid][bamCounter] = tmp_fpkc[cid] 
+                try:
+                    self.fpkc[cid][bamCounter] = tmp_fpkc[cid]
+                except KeyError:
+                    pass
             self.numParsed += 1
         finally:
             self.varLock.release()

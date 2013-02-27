@@ -84,7 +84,8 @@ if __name__ == '__main__':
                                           help='calculate fpkc for one set of contigs',
                                           description='Calculate fpkc for one set of contigs')
     contig_parser.add_argument('contigs', help="fasta file of contigs")
-    contig_parser.add_argument('bams', nargs='+', help="bam file to parse")
+    contig_parser.add_argument('bams', nargs='+', 
+        help="bam file to parse. NOTE: only the contigs in the contigs file will be evaluated")
     contig_parser.add_argument('--outfile', '-o', default='stdout', help="print to file")
     contig_parser.add_argument('--threads', '-t', default=1, help="number of threads to use")
     
@@ -95,8 +96,10 @@ if __name__ == '__main__':
                                        help='calculate mfpkc for a set of bins',
                                        description='Calculate mfpkc for a set of bins')
     bin_parser.add_argument('contigs', help="fasta file of contigs")
-    bin_parser.add_argument('bins', help="bin assignments")
-    bin_parser.add_argument('bams', nargs='+', help="bam file to parse")
+    bin_parser.add_argument('bins', 
+        help="bin assignments.  File containing a single contig name and a bin name per line (TAB separated)")
+    bin_parser.add_argument('bams', nargs='+', 
+        help="bam file to parse. NOTE: only the contigs in the contigs file will be evaluated")
     bin_parser.add_argument('--outfile', '-o', default='stdout', help="print to file")
     bin_parser.add_argument('--threads', '-t', default=1, help="number of threads to use")
     
